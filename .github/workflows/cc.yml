@@ -2,9 +2,9 @@ name: code-coverage
 
 on:
   push:
-    branches: [ "main"]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,8 +18,6 @@ jobs:
     - name: Free Disk Space (Ubuntu)
       uses: jlumbroso/free-disk-space@main
       with:
-        # this might remove tools that are actually needed,
-        # if set to "true" but frees about 6 GB
         tool-cache: false
         android: true
         dotnet: true
@@ -34,24 +32,24 @@ jobs:
         submodules: recursive
 
     - name: Setup Rust (cache & toolchain)
-      uses: ./.github/actions/setup-rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
 
-    - name: Run unittest
-      run: cargo test --no-fail-fast
+    - name: Run unittest with coverage
+      run: |
+        RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests" cargo test --no-fail-fast
       env:
         CARGO_INCREMENTAL: '0'
-        RUSTC_BOOTSTRAP: '1'
-        RUSTFLAGS: '-Zprofile -Ccodegen-units=1 -Copt-level=0 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
-        RUSTDOCFLAGS: '-Zprofile -Ccodegen-units=1 -Copt-level=0 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests'
 
-    - id: coverage
+    - name: Generate coverage report
       uses: actions-rs/grcov@v0.1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ${{ steps.coverage.outputs.report }}
-        # Disable to avoid CI failure as following:
-        # ['error'] There was an error running the uploader: Error uploading to https://codecov.io: Error: There was an error fetching the storage 
-        # URL during POST: 404 - {'detail': ErrorDetail(string='Could not find a repository, try using repo upload token', code='not_found')}
-        # fail_ci_if_error: true
+        fail_ci_if_error: false
